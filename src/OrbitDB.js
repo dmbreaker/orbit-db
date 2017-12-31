@@ -9,7 +9,7 @@ const DocumentStore = require('orbit-db-docstore')
 const Pubsub = require('orbit-db-pubsub')
 const Cache = require('orbit-db-cache')
 const Keystore = require('orbit-db-keystore')
-const AccessController = require('./ipfs-access-controller')
+const AccessController = require('./orbit-db-access-controllers')
 const OrbitDBAddress = require('./orbit-db-address')
 const createDBManifest = require('./db-manifest')
 
@@ -108,8 +108,7 @@ class OrbitDB {
 
     let accessController
     if (options.accessControllerAddress) {
-      accessController = new AccessController(this._ipfs)
-      await accessController.load(options.accessControllerAddress)
+      accessController = await AccessController.load(options.accessControllerAddress, this, this._ipfs)
     }
 
     const cache = await this._loadCache(this.directory, address)
@@ -204,15 +203,7 @@ class OrbitDB {
       throw new Error(`Given database name is an address. Please give only the name of the database!`)
 
     // Create an AccessController
-    const accessController = new AccessController(this._ipfs)
-    /* Disabled temporarily until we do something with the admin keys */
-    // Add admins of the database to the access controller
-    // if (options && options.admin) {
-    //   options.admin.forEach(e => accessController.add('admin', e))
-    // } else {
-    //   // Default is to add ourselves as the admin of the database
-    //   accessController.add('admin', this.key.getPublic('hex'))
-    // }
+    const accessController = await AccessController.create(options.accessControllerType || 'orbitdb', name, this, this._ipfs)
     // Add keys that can write to the database
     if (options && options.write && options.write.length > 0) {
       options.write.forEach(e => accessController.add('write', e))
@@ -325,7 +316,7 @@ class OrbitDB {
     try {
       cache = await Cache.load(directory, dbAddress)
     } catch (e) {
-      console.log(e)
+      console.error(e)
       logger.error("Couldn't load Cache:", e)
     }
 
